@@ -1,13 +1,26 @@
 import streamlit as st
-import language_tool_python
 from PyPDF2 import PdfReader
 from docx import Document
 import pytesseract
 from PIL import Image
-import io
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import torch
 
-# Use LanguageTool public API (no Java required)
-tool = language_tool_python.LanguageToolPublicAPI('en-US')
+# Load Hugging Face grammar correction model
+@st.cache_resource(show_spinner=False)
+def load_model():
+    tokenizer = AutoTokenizer.from_pretrained("prithivida/grammar_error_correcter_v1")
+    model = AutoModelForSeq2SeqLM.from_pretrained("prithivida/grammar_error_correcter_v1")
+    return tokenizer, model
+
+tokenizer, model = load_model()
+
+# Function to correct grammar using the model
+def fix_grammar(text):
+    inputs = tokenizer.encode(text, return_tensors="pt", truncation=True, max_length=512)
+    outputs = model.generate(inputs, max_length=512)
+    corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return corrected_text
 
 # Function to extract text from PDF
 def extract_text_from_pdf(file):
@@ -30,20 +43,6 @@ def extract_text_from_image(file):
     image = Image.open(file)
     text = pytesseract.image_to_string(image)
     return text
-
-# Function to perform grammar check
-def check_grammar(text):
-    matches = tool.check(text)
-    errors = []
-    suggestions = []
-    for match in matches:
-        if match.ruleIssueType == 'misspelling':
-            suggestions.append(
-                f"Possible misspelling: '{match.context}' -> Suggested: '{match.replacements[0] if match.replacements else 'Check manually'}'"
-            )
-        else:
-            errors.append(f"Grammar issue: {match.message} in '{match.context}'")
-    return errors, suggestions
 
 # Custom CSS for blue and white theme
 st.markdown("""
@@ -81,7 +80,7 @@ st.markdown("""
 # Streamlit UI
 st.set_page_config(page_title="AI Grammar Checker", page_icon="📝", layout="centered")
 st.title("AI Grammar Checker")
-st.markdown("Enter text or upload a file (.pdf, .docx, .jpeg, .jpg, .png) for grammar checking.")
+st.markdown("Enter text or upload a file (.pdf, .docx, .jpeg, .jpg, .png) for grammar correction.")
 
 # Text input
 text_input = st.text_area("Enter your text here:", height=200)
@@ -89,10 +88,10 @@ text_input = st.text_area("Enter your text here:", height=200)
 # File uploader
 uploaded_file = st.file_uploader("Or upload a file:", type=["pdf", "docx", "jpeg", "jpg", "png"])
 
-# Button to check grammar
-if st.button("Check Grammar"):
+# Button to correct grammar
+if st.button("Correct Grammar"):
     content_to_check = text_input.strip()
-    
+
     if uploaded_file is not None:
         file_type = uploaded_file.type
         try:
@@ -108,26 +107,16 @@ if st.button("Check Grammar"):
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
             content_to_check = ""
-    
+
     if content_to_check:
-        with st.spinner("Checking grammar..."):
-            errors, suggestions = check_grammar(content_to_check)
-        
-        st.subheader("Results:")
-        if not errors and not suggestions:
-            st.success("No obvious grammar issues found. Great job!")
-        else:
-            if errors:
-                st.error("Errors found:")
-                for error in errors:
-                    st.write(f"- {error}")
-            if suggestions:
-                st.warning("Suggestions:")
-                for suggestion in suggestions:
-                    st.write(f"- {suggestion}")
+        with st.spinner("Correcting grammar..."):
+            corrected_text = fix_grammar(content_to_check)
+
+        st.subheader("Corrected Text:")
+        st.text_area("", value=corrected_text, height=300)
     else:
-        st.error("No text found to check. Please enter text or upload a valid file.")
+        st.error("No text found to correct. Please enter text or upload a valid file.")
 
 # Footer
 st.markdown("---")
-st.markdown("Powered by LanguageTool Public API and Streamlit. For advanced AI, consider integrating GPT models.")
+st.markdown("Powered by Hugging Face Transformers and Streamlit.")
