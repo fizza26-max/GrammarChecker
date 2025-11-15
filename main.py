@@ -93,7 +93,6 @@ st.markdown("""
 # Streamlit UI
 st.set_page_config(page_title="AI Grammar Checker", page_icon="📝", layout="centered")
 st.title("AI Grammar Checker")
-st.markdown("Enter text or upload a file (.pdf, .docx, .jpeg, .jpg, .png) for grammar checking. Problematic lines will be highlighted, and you can correct them individually.")
 
 # Text input
 text_input = st.text_area("Enter your text here:", height=200)
