@@ -5,6 +5,7 @@ import pytesseract
 from PIL import Image
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import torch
+import re
 
 # Load Hugging Face grammar correction model
 @st.cache_resource(show_spinner=False)
@@ -44,6 +45,12 @@ def extract_text_from_image(file):
     text = pytesseract.image_to_string(image)
     return text
 
+# Function to split text into lines (sentences or paragraphs)
+def split_into_lines(text):
+    # Split by newlines or sentences (basic split)
+    lines = re.split(r'(?<=[.!?])\s+', text.strip())
+    return [line.strip() for line in lines if line.strip()]
+
 # Custom CSS for blue and white theme
 st.markdown("""
     <style>
@@ -74,13 +81,19 @@ st.markdown("""
     .stAlert {
         border-left: 5px solid #0066cc;
     }
+    .highlight {
+        background-color: #ffe6e6; /* Light red for highlighting errors */
+        padding: 5px;
+        border-radius: 3px;
+        margin: 5px 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # Streamlit UI
 st.set_page_config(page_title="AI Grammar Checker", page_icon="📝", layout="centered")
 st.title("AI Grammar Checker")
-st.markdown("Enter text or upload a file (.pdf, .docx, .jpeg, .jpg, .png) for grammar correction.")
+st.markdown("Enter text or upload a file (.pdf, .docx, .jpeg, .jpg, .png) for grammar checking. Problematic lines will be highlighted, and you can correct them individually.")
 
 # Text input
 text_input = st.text_area("Enter your text here:", height=200)
@@ -88,8 +101,8 @@ text_input = st.text_area("Enter your text here:", height=200)
 # File uploader
 uploaded_file = st.file_uploader("Or upload a file:", type=["pdf", "docx", "jpeg", "jpg", "png"])
 
-# Button to correct grammar
-if st.button("Correct Grammar"):
+# Button to check grammar
+if st.button("Check Grammar"):
     content_to_check = text_input.strip()
 
     if uploaded_file is not None:
@@ -109,13 +122,19 @@ if st.button("Correct Grammar"):
             content_to_check = ""
 
     if content_to_check:
-        with st.spinner("Correcting grammar..."):
-            corrected_text = fix_grammar(content_to_check)
-
-        st.subheader("Corrected Text:")
-        st.text_area("", value=corrected_text, height=300)
+        lines = split_into_lines(content_to_check)
+        st.subheader("Grammar Check Results:")
+        
+        for i, line in enumerate(lines):
+            corrected_line = fix_grammar(line)
+            if corrected_line.strip().lower() != line.strip().lower():  # If there's a difference, mark as problematic
+                st.markdown(f'<div class="highlight"><strong>Line {i+1} (Needs Correction):</strong> {line}</div>', unsafe_allow_html=True)
+                if st.button(f"Correct Line {i+1}", key=f"correct_{i}"):
+                    st.write(f"**Corrected:** {corrected_line}")
+            else:
+                st.write(f"**Line {i+1} (OK):** {line}")
     else:
-        st.error("No text found to correct. Please enter text or upload a valid file.")
+        st.error("No text found to check. Please enter text or upload a valid file.")
 
 # Footer
 st.markdown("---")
