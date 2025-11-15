@@ -138,4 +138,4 @@ if st.button("Check Grammar"):
 
 # Footer
 st.markdown("---")
-st.markdown("Powered by Hugging Face Transformers and Streamlit.")
+
