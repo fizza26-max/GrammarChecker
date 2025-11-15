@@ -6,23 +6,23 @@ import pytesseract
 from PIL import Image
 import io
 
-# Initialize LanguageTool for grammar checking
-tool = language_tool_python.LanguageTool('en-US')
+# Use LanguageTool public API (no Java required)
+tool = language_tool_python.LanguageToolPublicAPI('en-US')
 
 # Function to extract text from PDF
 def extract_text_from_pdf(file):
     reader = PdfReader(file)
     text = ""
     for page in reader.pages:
-        text += page.extract_text() + "\n"
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
     return text
 
 # Function to extract text from DOCX
 def extract_text_from_docx(file):
     doc = Document(file)
-    text = ""
-    for para in doc.paragraphs:
-        text += para.text + "\n"
+    text = "\n".join([para.text for para in doc.paragraphs])
     return text
 
 # Function to extract text from image using OCR
@@ -38,7 +38,9 @@ def check_grammar(text):
     suggestions = []
     for match in matches:
         if match.ruleIssueType == 'misspelling':
-            suggestions.append(f"Possible misspelling: '{match.context}' -> Suggested: '{match.replacements[0] if match.replacements else 'Check manually'}'")
+            suggestions.append(
+                f"Possible misspelling: '{match.context}' -> Suggested: '{match.replacements[0] if match.replacements else 'Check manually'}'"
+            )
         else:
             errors.append(f"Grammar issue: {match.message} in '{match.context}'")
     return errors, suggestions
@@ -47,17 +49,17 @@ def check_grammar(text):
 st.markdown("""
     <style>
     body {
-        background-color: #ffffff; /* White background */
-        color: #003366; /* Dark blue text */
+        background-color: #ffffff;
+        color: #003366;
     }
     .stButton>button {
-        background-color: #0066cc; /* Blue button */
+        background-color: #0066cc;
         color: #ffffff;
         border: none;
         border-radius: 5px;
     }
     .stButton>button:hover {
-        background-color: #004d99; /* Darker blue on hover */
+        background-color: #004d99;
     }
     .stTextArea textarea {
         border: 1px solid #0066cc;
@@ -68,13 +70,13 @@ st.markdown("""
     .stFileUploader {
         border: 1px solid #0066cc;
         border-radius: 5px;
-        background-color: #e6f2ff; /* Light blue background for uploader */
+        background-color: #e6f2ff;
     }
     .stAlert {
         border-left: 5px solid #0066cc;
     }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Streamlit UI
 st.set_page_config(page_title="AI Grammar Checker", page_icon="📝", layout="centered")
@@ -89,7 +91,7 @@ uploaded_file = st.file_uploader("Or upload a file:", type=["pdf", "docx", "jpeg
 
 # Button to check grammar
 if st.button("Check Grammar"):
-    content_to_check = text_input
+    content_to_check = text_input.strip()
     
     if uploaded_file is not None:
         file_type = uploaded_file.type
@@ -107,7 +109,7 @@ if st.button("Check Grammar"):
             st.error(f"Error processing file: {str(e)}")
             content_to_check = ""
     
-    if content_to_check.strip():
+    if content_to_check:
         with st.spinner("Checking grammar..."):
             errors, suggestions = check_grammar(content_to_check)
         
@@ -128,4 +130,4 @@ if st.button("Check Grammar"):
 
 # Footer
 st.markdown("---")
-st.markdown("Powered by LanguageTool and Streamlit. For advanced AI, consider integrating with GPT models.")
+st.markdown("Powered by LanguageTool Public API and Streamlit. For advanced AI, consider integrating GPT models.")
